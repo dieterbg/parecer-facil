@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Parecer Fácil - Gerador de Relatórios com IA
 
-## Getting Started
+Aplicativo Full-Stack para professores de educação infantil gerarem pareceres descritivos a partir de áudios, utilizando IA (n8n + Gemini/Claude).
 
-First, run the development server:
+## 🚀 Tecnologias
+
+- **Frontend**: Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui
+- **Backend**: Supabase (Auth, Database, Storage, Realtime)
+- **AI Orchestration**: n8n (Webhook, Supabase Node, AI Nodes)
+
+## 🛠️ Configuração
+
+### 1. Supabase
+1. Crie um projeto no [Supabase](https://supabase.com).
+2. Execute o script SQL em `supabase/schema.sql` no SQL Editor do Supabase para criar as tabelas e políticas de segurança.
+3. Execute também `supabase/add_paginas_esperadas.sql` e `supabase/add_transcricao.sql` para adicionar os novos campos.
+4. Crie um bucket no Storage chamado `audios` e defina como público.
+5. Habilite Email Auth em Authentication > Providers.
+
+### 2. n8n
+1. Importe o arquivo `n8n/workflow.json` no seu n8n.
+2. Configure as credenciais do Supabase e do Google Gemini nos nós correspondentes.
+3. Ative o workflow e copie a URL do Webhook de Produção.
+
+### 3. Variáveis de Ambiente
+Renomeie `.env.example` para `.env.local` e preencha:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SUPABASE_URL=sua-url-supabase
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-chave-anonima
+NEXT_PUBLIC_N8N_WEBHOOK_URL=sua-url-webhook-n8n
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 4. Rodando Localmente
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm install
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Acesse `http://localhost:3000`.
 
-## Learn More
+## 📱 Funcionalidades
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Autenticação**: Login e cadastro com email/senha.
+- **Dashboard**: Lista de pareceres com status em tempo real e opção de exclusão.
+- **Novo Parecer**: Gravação de áudio no navegador (até 10 min) ou upload de arquivo.
+- **Perfil**: Personalização do estilo de escrita, nome, email e número de páginas esperado.
+- **Visualização**: Página de detalhes com áudio original e texto gerado.
+- **Integração n8n**: Processamento assíncrono com Google Gemini.
