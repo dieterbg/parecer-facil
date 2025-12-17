@@ -7,77 +7,93 @@ import { Input } from "@/components/ui/input";
 import { AudioRecorder } from "@/components/audio-recorder";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface Aluno {
+    id: string;
+    nome: string;
+    turma_id: string;
+    turma: { nome: string };
+}
 
 export default function NovoParecerPage() {
     const { user } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+
     const [loading, setLoading] = useState(false);
-    const [nome, setNome] = useState("");
-    const [idade, setIdade] = useState("");
+    const [alunos, setAlunos] = useState<Aluno[]>([]);
+    const [selectedAlunoId, setSelectedAlunoId] = useState<string>(searchParams.get('alunoId') || "");
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+    const [instrucoes, setInstrucoes] = useState("");
+
+    // Carregar alunos do professor
+    useEffect(() => {
+        if (!user) return;
+        const fetchAlunos = async () => {
+            const { data } = await supabase
+                .from('alunos')
+                .select('id, nome, turma_id, turma:turmas(nome)')
+                .eq('ativo', true);
+
+            if (data) setAlunos(data as any);
+        };
+        fetchAlunos();
+    }, [user]);
 
     const handleSubmit = async () => {
-        if (!user || !audioBlob || !nome) return;
+        if (!user || !selectedAlunoId) return;
 
         setLoading(true);
         try {
-            // 1. Upload Audio
-            const parecerId = crypto.randomUUID();
-            const fileName = `${user.id}/${parecerId}.webm`;
+            let publicUrl = null;
 
-            const { error: uploadError } = await supabase.storage
-                .from('audios')
-                .upload(fileName, audioBlob);
+            // 1. Upload Audio if exists
+            if (audioBlob) {
+                const parecerId = crypto.randomUUID();
+                const fileName = `${user.id}/${parecerId}.webm`;
+                const { error: uploadError } = await supabase.storage
+                    .from('audios')
+                    .upload(fileName, audioBlob);
 
-            if (uploadError) throw uploadError;
-
-            const { data: { publicUrl } } = supabase.storage
-                .from('audios')
-                .getPublicUrl(fileName);
-
-            // 2. Create Database Record
-            const { error: dbError } = await supabase
-                .from('pareceres')
-                .insert({
-                    id: parecerId,
-                    uid_professor: user.id,
-                    aluno_nome: nome,
-                    aluno_idade: idade,
-                    audio_url: publicUrl,
-                    status: 'processando'
-                });
-
-            if (dbError) throw dbError;
-
-            // 3. Call n8n Webhook (via Proxy)
-            console.log('Calling internal webhook proxy...');
-
-            try {
-                const response = await fetch('/api/webhook', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        parecerId,
-                        professorUid: user.id
-                    })
-                });
-
-                console.log('Proxy response status:', response.status);
-
-                if (!response.ok) {
-                    const text = await response.text();
-                    console.error('Webhook proxy error:', text);
-                }
-            } catch (fetchError) {
-                console.error('Fetch error details:', fetchError);
+                if (uploadError) throw uploadError;
+                const { data } = supabase.storage.from('audios').getPublicUrl(fileName);
+                publicUrl = data.publicUrl;
             }
 
-            router.push('/dashboard');
-        } catch (error) {
+            const aluno = alunos.find(a => a.id === selectedAlunoId);
+            if (!aluno) throw new Error("Aluno não encontrado");
+
+            // 2. Call Internal API
+            const response = await fetch('/api/gerar-parecer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    aluno_id: selectedAlunoId,
+                    turma_id: aluno.turma_id,
+                    professor_instrucoes: instrucoes,
+                    periodo_inicio: '2024-01-01', // TODO: Permitir selecionar datas
+                    periodo_fim: new Date().toISOString(),
+                    audio_url: publicUrl
+                })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || "Erro na geração");
+            }
+
+            const { parecer } = await response.json();
+
+            // Redirect to edit page
+            router.push(`/parecer/${parecer.id}`);
+
+        } catch (error: any) {
             console.error('Error creating parecer:', error);
-            alert('Erro ao criar parecer. Tente novamente.');
+            alert(`Erro: ${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -92,43 +108,49 @@ export default function NovoParecerPage() {
                             <ArrowLeft className="w-6 h-6" />
                         </Link>
                     </Button>
-                    <h1 className="text-2xl font-bold">Novo Parecer</h1>
+                    <h1 className="text-2xl font-bold">Novo Parecer Descritivo (IA)</h1>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Dados do Aluno</CardTitle>
+                        <CardTitle>Configuração</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Nome do Aluno</label>
-                                <Input
-                                    placeholder="Ex: João Silva"
-                                    value={nome}
-                                    onChange={(e) => setNome(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Idade / Turma</label>
-                                <Input
-                                    placeholder="Ex: 4 anos - Maternal II"
-                                    value={idade}
-                                    onChange={(e) => setIdade(e.target.value)}
-                                />
-                            </div>
+                        <div className="space-y-2">
+                            <Label>Selecione o Aluno</Label>
+                            <Select value={selectedAlunoId} onValueChange={setSelectedAlunoId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {alunos.map(aluno => (
+                                        <SelectItem key={aluno.id} value={aluno.id}>
+                                            {aluno.nome} ({aluno.turma?.nome})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Instruções Adicionais (Opcional)</Label>
+                            <Input
+                                placeholder="Ex: Focar na evolução da escrita..."
+                                value={instrucoes}
+                                onChange={e => setInstrucoes(e.target.value)}
+                            />
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Observações em Áudio</CardTitle>
+                        <CardTitle>Contexto Verbal (Opcional)</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <AudioRecorder onAudioReady={setAudioBlob} />
                         <p className="text-sm text-muted-foreground mt-4">
-                            Grave um áudio descrevendo o desenvolvimento do aluno, pontos fortes e áreas a desenvolver. Fale naturalmente.
+                            Grave um áudio descrevendo pontos que não estão nos registros. A IA usará isso junto com as evidências do sistema.
                         </p>
                     </CardContent>
                 </Card>
@@ -137,12 +159,12 @@ export default function NovoParecerPage() {
                     size="lg"
                     className="w-full h-14 text-lg"
                     onClick={handleSubmit}
-                    disabled={loading || !audioBlob || !nome}
+                    disabled={loading || !selectedAlunoId}
                 >
                     {loading ? (
                         <>
                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            Enviando...
+                            Gerando Parecer...
                         </>
                     ) : (
                         <>
@@ -155,3 +177,4 @@ export default function NovoParecerPage() {
         </div>
     );
 }
+

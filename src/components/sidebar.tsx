@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, PlusCircle, User, LogOut, FileText } from "lucide-react";
+import { LayoutDashboard, PlusCircle, User, LogOut, FileText, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/components/auth-provider";
@@ -12,6 +12,11 @@ const sidebarItems = [
         title: "Dashboard",
         href: "/dashboard",
         icon: LayoutDashboard,
+    },
+    {
+        title: "Minhas Turmas",
+        href: "/turmas",
+        icon: Users,
     },
     {
         title: "Novo Parecer",
