@@ -6,16 +6,12 @@ import { supabase } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Plus, Users, Loader2, Trash2, FileSpreadsheet, User, ExternalLink, Calendar, ChevronLeft, ChevronRight, Camera, FileText, Video, Mic } from "lucide-react";
+import { ArrowLeft, Plus, Users, Loader2, Trash2, FileSpreadsheet, ExternalLink, Camera } from "lucide-react";
 import Link from "next/link";
 import { ImportadorExcel } from "@/components/importador-excel";
 import { TimelineView } from "@/components/timeline";
-import { WeeklyCalendar, MarkRealizadaModal, DayDetailModal } from "@/components/planejamento";
-import { BnccSelector } from "@/components/planejamento/bncc-selector";
-import { NovoRegistro } from "@/components/novo-registro";
-import { calcularIdade, getSegundaFeira, formatarSemana, TIPOS_ATIVIDADE, DIAS_SEMANA, type AtividadePlanejada, type TipoAtividade, type RegistroComDetalhes } from "@/types/database";
-import { usePlanejamento } from "@/hooks/use-planejamento";
-import { useRegistros } from "@/hooks/use-registros";
+
+import { calcularIdade } from "@/types/database";
 
 interface Turma {
     id: string;
@@ -42,48 +38,8 @@ export default function TurmaDetailsPage() {
     const [showImportExcel, setShowImportExcel] = useState(false);
     const [novoAluno, setNovoAluno] = useState({ nome: "", data_nascimento: "" });
     const [saving, setSaving] = useState(false);
-    const [activeTab, setActiveTab] = useState<'alunos' | 'diario'>('diario');
-    const [currentWeek, setCurrentWeek] = useState(() => getSegundaFeira());
-    const [showAddModal, setShowAddModal] = useState<{ dia: number; tipo: 'atividade' | 'registro' } | null>(null);
-    const [showRealizadaModal, setShowRealizadaModal] = useState<AtividadePlanejada | null>(null);
-    const [newActivityTitle, setNewActivityTitle] = useState('');
-    const [newActivityTipo, setNewActivityTipo] = useState<TipoAtividade>('livre');
-    const [newActivityBncc, setNewActivityBncc] = useState<string[]>([]);
-    const [savingActivity, setSavingActivity] = useState(false);
-    const [selectedDay, setSelectedDay] = useState<number | null>(null);
-    const [showNovoRegistro, setShowNovoRegistro] = useState(false);
-    const [registroParaAtividade, setRegistroParaAtividade] = useState<AtividadePlanejada | null>(null);
-    const [editingRegistro, setEditingRegistro] = useState<RegistroComDetalhes | null>(null);
-    const [editingAtividade, setEditingAtividade] = useState<AtividadePlanejada | null>(null);
+    const [activeTab, setActiveTab] = useState<'alunos' | 'registros'>('registros');
 
-    // Hook de planejamento
-    const {
-        planejamentoAtual,
-        loading: loadingPlanejamento,
-        getOrCreatePlanejamentoSemana,
-        moverAtividade,
-        removeAtividadePlanejada,
-        addAtividadePlanejada,
-        getPlanejamentoComAtividades
-    } = usePlanejamento({ turmaId: params.id as string });
-
-    // Hook de registros
-    const { registros, refetch: refetchRegistros } = useRegistros({});
-
-    // Filtrar registros da semana atual
-    const registrosDaSemana = registros.filter(r => {
-        const regDate = new Date(r.data_registro || r.created_at);
-        const semanaFim = new Date(currentWeek);
-        semanaFim.setDate(semanaFim.getDate() + 4); // até sexta
-        return regDate >= currentWeek && regDate <= semanaFim;
-    });
-
-    // Carregar planejamento quando mudar semana
-    useEffect(() => {
-        if (params.id && activeTab === 'diario') {
-            getOrCreatePlanejamentoSemana(params.id as string, currentWeek);
-        }
-    }, [params.id, currentWeek, activeTab, getOrCreatePlanejamentoSemana]);
 
     useEffect(() => {
         if (params.id) {
@@ -211,13 +167,13 @@ export default function TurmaDetailsPage() {
                 {/* Tabs */}
                 <div className="flex gap-2 border-b border-border pb-2">
                     <button
-                        onClick={() => setActiveTab('diario')}
-                        className={`px-4 py-2 font-medium rounded-t-lg transition-colors ${activeTab === 'diario'
+                        onClick={() => setActiveTab('registros')}
+                        className={`px-4 py-2 font-medium rounded-t-lg transition-colors ${activeTab === 'registros'
                             ? 'bg-primary text-primary-foreground'
                             : 'text-muted-foreground hover:text-foreground'
                             }`}
                     >
-                        📅 Diário
+                        📷 Registros
                     </button>
                     <button
                         onClick={() => setActiveTab('alunos')}
@@ -230,82 +186,17 @@ export default function TurmaDetailsPage() {
                     </button>
                 </div>
 
-                {/* Tab: Diário (Calendário unificado) */}
-                {activeTab === 'diario' && (
+                {/* Tab: Registros (Timeline) */}
+                {activeTab === 'registros' && (
                     <Card>
                         <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="flex items-center gap-2">
-                                    <Calendar className="w-5 h-5" />
-                                    Diário da Turma
-                                </CardTitle>
-                                <div className="flex items-center gap-2">
-                                    <Button variant="outline" size="icon" onClick={() => {
-                                        const newWeek = new Date(currentWeek);
-                                        newWeek.setDate(newWeek.getDate() - 7);
-                                        setCurrentWeek(newWeek);
-                                    }}>
-                                        <ChevronLeft className="w-4 h-4" />
-                                    </Button>
-                                    <div className="px-4 py-2 bg-primary/10 rounded-lg min-w-[180px] text-center">
-                                        <span className="font-medium text-sm">{formatarSemana(currentWeek)}</span>
-                                    </div>
-                                    <Button variant="outline" size="icon" onClick={() => {
-                                        const newWeek = new Date(currentWeek);
-                                        newWeek.setDate(newWeek.getDate() + 7);
-                                        setCurrentWeek(newWeek);
-                                    }}>
-                                        <ChevronRight className="w-4 h-4" />
-                                    </Button>
-                                    <div className="border-l h-6 mx-2" />
-                                    <Button onClick={() => setShowNovoRegistro(true)} className="gap-2">
-                                        <Camera className="w-4 h-4" />
-                                        + Registro
-                                    </Button>
-                                </div>
-                            </div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Camera className="w-5 h-5" />
+                                Registros e Observações
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {loadingPlanejamento ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                                </div>
-                            ) : planejamentoAtual ? (
-                                <WeeklyCalendar
-                                    planejamento={planejamentoAtual}
-                                    currentWeek={currentWeek}
-                                    registros={registrosDaSemana}
-                                    onMoveActivity={(id, dia, ordem) => moverAtividade(id, dia, ordem)}
-                                    onToggleRealizada={(id) => {
-                                        const ativ = planejamentoAtual.atividades_planejadas?.find(a => a.id === id);
-                                        if (ativ && !ativ.realizada) {
-                                            setShowRealizadaModal(ativ);
-                                        }
-                                    }}
-                                    onRemoveActivity={(id) => {
-                                        if (confirm('Remover esta atividade?')) {
-                                            removeAtividadePlanejada(id);
-                                        }
-                                    }}
-                                    onAddActivity={(dia) => setShowAddModal({ dia, tipo: 'atividade' })}
-                                    onActivityClick={(atividade) => setEditingAtividade(atividade)}
-                                    onDayClick={(dia) => setSelectedDay(dia)}
-                                    onRegistroClick={(registro) => {
-                                        const fullRegistro = registrosDaSemana.find(r => r.id === registro.id);
-                                        if (fullRegistro) {
-                                            setEditingRegistro(fullRegistro);
-                                        }
-                                    }}
-                                    onAddRegistro={(atividade) => {
-                                        setRegistroParaAtividade(atividade);
-                                        setShowNovoRegistro(true);
-                                    }}
-                                />
-                            ) : (
-                                <div className="text-center py-12 text-muted-foreground">
-                                    Carregando...
-                                </div>
-                            )}
+                            <TimelineView turmaId={turma.id} />
                         </CardContent>
                     </Card>
                 )}
@@ -396,7 +287,16 @@ export default function TurmaDetailsPage() {
                                                 <Button variant="ghost" size="icon" asChild className="h-8 w-8">
                                                     <Link href={`/alunos/${aluno.id}`}><ExternalLink className="w-4 h-4" /></Link>
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDeleteAluno(aluno.id, aluno.nome)}>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        // Pequeno timeout para garantir que UI não bloqueie
+                                                        setTimeout(() => handleDeleteAluno(aluno.id, aluno.nome), 10);
+                                                    }}
+                                                >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
                                             </div>
@@ -408,370 +308,9 @@ export default function TurmaDetailsPage() {
                     </Card>
                 )}
 
-                {/* Modal adicionar atividade rápida */}
-                {showAddModal && planejamentoAtual && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <Card className="w-full max-w-md">
-                            <CardHeader>
-                                <CardTitle>Nova Atividade</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Título</label>
-                                    <Input
-                                        placeholder="Nome da atividade"
-                                        value={newActivityTitle}
-                                        onChange={(e) => setNewActivityTitle(e.target.value)}
-                                        autoFocus
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Tipo</label>
-                                    <div className="grid grid-cols-5 gap-2">
-                                        {(Object.entries(TIPOS_ATIVIDADE) as [TipoAtividade, { label: string; icon: string; cor: string }][]).map(([tipo, info]) => (
-                                            <button
-                                                key={tipo}
-                                                type="button"
-                                                onClick={() => setNewActivityTipo(tipo)}
-                                                className={`p-2 rounded-lg text-center transition-all ${newActivityTipo === tipo
-                                                    ? 'ring-2 ring-primary bg-primary/10'
-                                                    : 'bg-muted hover:bg-muted/80'
-                                                    }`}
-                                            >
-                                                <span className="text-xl block mb-1">{info.icon}</span>
-                                                <span className="text-[10px]">{info.label.split(' ')[0]}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Campos BNCC</label>
-                                    <BnccSelector
-                                        selectedCodigos={newActivityBncc}
-                                        onChange={setNewActivityBncc}
-                                        maxSelections={3}
-                                    />
-                                </div>
-                                <div className="flex gap-2 pt-4">
-                                    <Button variant="outline" className="flex-1" onClick={() => setShowAddModal(null)}>
-                                        Cancelar
-                                    </Button>
-                                    <Button
-                                        className="flex-1"
-                                        disabled={!newActivityTitle.trim() || savingActivity}
-                                        onClick={async () => {
-                                            setSavingActivity(true);
-                                            try {
-                                                const tipoInfo = TIPOS_ATIVIDADE[newActivityTipo];
-                                                await addAtividadePlanejada({
-                                                    planejamento_id: planejamentoAtual.id,
-                                                    titulo: newActivityTitle,
-                                                    dia_semana: showAddModal.dia,
-                                                    cor: tipoInfo.cor,
-                                                    duracao_minutos: 30,
-                                                    campos_bncc: newActivityBncc.length > 0 ? newActivityBncc : undefined,
-                                                });
-                                                setShowAddModal(null);
-                                                setNewActivityTitle('');
-                                                setNewActivityTipo('livre');
-                                                setNewActivityBncc([]);
-                                            } finally {
-                                                setSavingActivity(false);
-                                            }
-                                        }}
-                                    >
-                                        {savingActivity ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Adicionar'}
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
 
-                {/* Modal marcar realizada */}
-                {showRealizadaModal && (
-                    <MarkRealizadaModal
-                        atividade={showRealizadaModal}
-                        currentWeek={currentWeek}
-                        onClose={() => setShowRealizadaModal(null)}
-                        onSuccess={() => {
-                            setShowRealizadaModal(null);
-                            if (planejamentoAtual) {
-                                getPlanejamentoComAtividades(planejamentoAtual.id);
-                            }
-                        }}
-                    />
-                )}
-
-                {/* Modal detalhes do dia */}
-                {selectedDay && planejamentoAtual && (
-                    <DayDetailModal
-                        isOpen={!!selectedDay}
-                        onClose={() => setSelectedDay(null)}
-                        turmaId={params.id as string}
-                        dia={selectedDay}
-                        dataInicio={currentWeek}
-                        atividades={planejamentoAtual.atividades_planejadas?.filter(a => a.dia_semana === selectedDay) || []}
-                        alunos={alunos.map(a => ({ id: a.id, nome: a.nome }))}
-                        onToggleRealizada={(id) => {
-                            const ativ = planejamentoAtual.atividades_planejadas?.find(a => a.id === id);
-                            if (ativ && !ativ.realizada) {
-                                setSelectedDay(null);
-                                setShowRealizadaModal(ativ);
-                            }
-                        }}
-                    />
-                )}
-
-                {/* Modal Novo Registro */}
-                {showNovoRegistro && turma && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="max-w-2xl w-full">
-                            <NovoRegistro
-                                turmaId={turma.id}
-                                alunos={alunos.map(a => ({ id: a.id, nome: a.nome }))}
-                                currentWeek={currentWeek}
-                                atividade={registroParaAtividade ? {
-                                    id: registroParaAtividade.id,
-                                    titulo: registroParaAtividade.titulo,
-                                    dia_semana: registroParaAtividade.dia_semana
-                                } : undefined}
-                                onSuccess={() => {
-                                    setShowNovoRegistro(false);
-                                    setRegistroParaAtividade(null);
-                                    refetchRegistros();
-                                }}
-                                onCancel={() => {
-                                    setShowNovoRegistro(false);
-                                    setRegistroParaAtividade(null);
-                                }}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {/* Modal Editar Registro */}
-                {editingRegistro && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <Card className="w-full max-w-lg">
-                            <CardHeader className="border-b">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-lg">Editar Registro</CardTitle>
-                                    <Button variant="ghost" size="icon" onClick={() => setEditingRegistro(null)}>
-                                        <ArrowLeft className="w-5 h-5" />
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-4 space-y-4">
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Tipo</label>
-                                    <div className="flex gap-2">
-                                        {['foto', 'video', 'audio', 'texto'].map(tipo => (
-                                            <span
-                                                key={tipo}
-                                                className={`px-3 py-1 rounded text-sm ${editingRegistro.tipo === tipo
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'bg-muted text-muted-foreground'
-                                                    }`}
-                                            >
-                                                {tipo === 'foto' && '📷'}
-                                                {tipo === 'video' && '🎥'}
-                                                {tipo === 'audio' && '🎙️'}
-                                                {tipo === 'texto' && '📝'}
-                                                {' '}{tipo}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Data</label>
-                                    <p className="text-sm">
-                                        {new Date(editingRegistro.data_registro || editingRegistro.created_at).toLocaleDateString('pt-BR', {
-                                            weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
-                                        })}
-                                    </p>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Descrição</label>
-                                    <textarea
-                                        className="w-full border rounded-lg p-3 min-h-[100px] bg-background"
-                                        value={editingRegistro.descricao || ''}
-                                        onChange={(e) => setEditingRegistro({
-                                            ...editingRegistro,
-                                            descricao: e.target.value
-                                        })}
-                                    />
-                                </div>
-                                {editingRegistro.registros_alunos && editingRegistro.registros_alunos.length > 0 && (
-                                    <div>
-                                        <label className="text-sm font-medium mb-2 block">Alunos vinculados</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {editingRegistro.registros_alunos.map(ra => (
-                                                <span key={ra.aluno.id} className="px-2 py-1 bg-accent rounded text-sm">
-                                                    {ra.aluno.nome}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                <div className="flex gap-2 pt-4">
-                                    <Button
-                                        variant="destructive"
-                                        onClick={async () => {
-                                            if (confirm('Tem certeza que deseja excluir este registro?')) {
-                                                await supabase.from('registros').delete().eq('id', editingRegistro.id);
-                                                setEditingRegistro(null);
-                                                refetchRegistros();
-                                            }
-                                        }}
-                                    >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Excluir
-                                    </Button>
-                                    <div className="flex-1" />
-                                    <Button variant="outline" onClick={() => setEditingRegistro(null)}>
-                                        Cancelar
-                                    </Button>
-                                    <Button
-                                        onClick={async () => {
-                                            await supabase.from('registros').update({
-                                                descricao: editingRegistro.descricao
-                                            }).eq('id', editingRegistro.id);
-                                            setEditingRegistro(null);
-                                            refetchRegistros();
-                                        }}
-                                    >
-                                        Salvar
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
-                {/* Modal Editar Atividade */}
-                {editingAtividade && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <Card className="w-full max-w-lg">
-                            <CardHeader className="border-b">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-lg">Editar Atividade</CardTitle>
-                                    <Button variant="ghost" size="icon" onClick={() => setEditingAtividade(null)}>
-                                        <ArrowLeft className="w-5 h-5" />
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-4 space-y-4">
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Título</label>
-                                    <Input
-                                        value={editingAtividade.titulo}
-                                        onChange={(e) => setEditingAtividade({
-                                            ...editingAtividade,
-                                            titulo: e.target.value
-                                        })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Dia da Semana</label>
-                                    <div className="flex gap-2">
-                                        {[1, 2, 3, 4, 5].map(dia => (
-                                            <button
-                                                key={dia}
-                                                onClick={() => setEditingAtividade({
-                                                    ...editingAtividade,
-                                                    dia_semana: dia
-                                                })}
-                                                className={`px-3 py-1 rounded text-sm ${editingAtividade.dia_semana === dia
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'bg-muted hover:bg-accent'
-                                                    }`}
-                                            >
-                                                {DIAS_SEMANA[dia]}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-sm font-medium mb-2 block">Descrição/Observações</label>
-                                    <textarea
-                                        className="w-full border rounded-lg p-3 min-h-[80px] bg-background"
-                                        value={editingAtividade.observacoes || ''}
-                                        onChange={(e) => setEditingAtividade({
-                                            ...editingAtividade,
-                                            observacoes: e.target.value
-                                        })}
-                                        placeholder="Adicione observações sobre a atividade..."
-                                    />
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={editingAtividade.realizada}
-                                        onChange={(e) => setEditingAtividade({
-                                            ...editingAtividade,
-                                            realizada: e.target.checked
-                                        })}
-                                        className="w-4 h-4"
-                                    />
-                                    <span className="text-sm">Marcar como realizada</span>
-                                </div>
-                                <div className="flex gap-2 pt-4">
-                                    <Button
-                                        variant="destructive"
-                                        onClick={async () => {
-                                            if (confirm('Tem certeza que deseja excluir esta atividade?')) {
-                                                await removeAtividadePlanejada(editingAtividade.id);
-                                                setEditingAtividade(null);
-                                            }
-                                        }}
-                                    >
-                                        <Trash2 className="w-4 h-4 mr-2" />
-                                        Excluir
-                                    </Button>
-                                    <div className="flex-1" />
-                                    <Button variant="outline" onClick={() => setEditingAtividade(null)}>
-                                        Cancelar
-                                    </Button>
-                                    <Button
-                                        onClick={async () => {
-                                            await supabase.from('atividades_planejadas').update({
-                                                titulo: editingAtividade.titulo,
-                                                observacoes: editingAtividade.observacoes,
-                                                dia_semana: editingAtividade.dia_semana,
-                                                realizada: editingAtividade.realizada
-                                            }).eq('id', editingAtividade.id);
-                                            setEditingAtividade(null);
-                                            getPlanejamentoComAtividades(planejamentoAtual?.id || '');
-                                        }}
-                                    >
-                                        Salvar
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
-                {/* Modal: Detalhes do Dia (Timeline) */}
-                {selectedDay !== null && planejamentoAtual && (
-                    <DayDetailModal
-                        isOpen={selectedDay !== null}
-                        onClose={() => setSelectedDay(null)}
-                        turmaId={params.id as string}
-                        dia={selectedDay}
-                        dataInicio={currentWeek}
-                        atividades={planejamentoAtual.atividades_planejadas?.filter(a => a.dia_semana === selectedDay) || []}
-                        onToggleRealizada={(id) => {
-                            const ativ = planejamentoAtual.atividades_planejadas?.find(a => a.id === id);
-                            if (ativ && !ativ.realizada) {
-                                setShowRealizadaModal(ativ);
-                                setSelectedDay(null);
-                            }
-                        }}
-                    />
-                )}
             </div>
         </div>
     );
 }
+

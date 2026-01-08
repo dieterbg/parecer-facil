@@ -78,6 +78,8 @@ export interface Registro {
     url_arquivo: string | null;
     descricao: string | null;
     transcricao_voz: string | null;
+    tags_bncc: string[] | null;
+    ai_metadata: Record<string, any> | null;
     contexto_id: string | null;
     compartilhar_familia: boolean;
     is_evidencia: boolean;
@@ -180,6 +182,7 @@ export interface RegistroInsert {
     url_arquivo?: string;
     descricao?: string;
     transcricao_voz?: string;
+    tags_bncc?: string[];
     contexto_id?: string;
     compartilhar_familia?: boolean;
     is_evidencia?: boolean;
@@ -460,6 +463,15 @@ export function getSegundaFeira(data: Date = new Date()): Date {
     d.setDate(diff);
     d.setHours(0, 0, 0, 0);
     return d;
+}
+
+// Helper para formatar data para ISO YYYY-MM-DD (Local Time)
+// Evita o problema do toISOString() que converte para UTC
+export function formatarDataISO(data: Date): string {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
 }
 
 // Helper para formatar semana

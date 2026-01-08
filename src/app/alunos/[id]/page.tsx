@@ -28,6 +28,7 @@ import {
     AREAS_ICONES,
     type AreaDesenvolvimento
 } from '@/types/database';
+import { BnccChart, aggregateBnccTags } from '@/components/bncc-chart';
 
 interface Aluno {
     id: string;
@@ -48,6 +49,7 @@ interface Registro {
     url_arquivo: string | null;
     descricao: string | null;
     data_registro: string;
+    tags_bncc?: string[] | null;
 }
 
 export default function AlunoProfilePage() {
@@ -107,7 +109,7 @@ export default function AlunoProfilePage() {
                     .map(r => r.registro)
                     .filter(Boolean)
                     .sort((a: any, b: any) => new Date(b.data_registro).getTime() - new Date(a.data_registro).getTime());
-                setRegistros(regs as Registro[]);
+                setRegistros(regs as unknown as Registro[]);
             }
 
             // Buscar pareceres
@@ -239,11 +241,17 @@ export default function AlunoProfilePage() {
                             </Link>
                         )}
 
-                        <div className="mt-6">
+                        <div className="mt-6 flex flex-wrap gap-3 justify-center">
                             <Button className="rounded-full shadow-lg bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700" asChild>
                                 <Link href={`/novo?alunoId=${aluno.id}`}>
                                     <Sparkles className="w-4 h-4 mr-2" />
-                                    Gerar Parecer com IA
+                                    Gerar Esboço de Parecer
+                                </Link>
+                            </Button>
+                            <Button variant="outline" className="rounded-full" asChild>
+                                <Link href={`/relatorio?alunoId=${aluno.id}`}>
+                                    <FileText className="w-4 h-4 mr-2" />
+                                    Relatório de Atividades
                                 </Link>
                             </Button>
                         </div>
@@ -396,6 +404,16 @@ export default function AlunoProfilePage() {
                 {/* Tab: Marcos */}
                 {activeTab === 'marcos' && (
                     <div className="space-y-6">
+                        {/* Gráfico BNCC */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">Cobertura BNCC (Campos de Experiência)</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <BnccChart data={aggregateBnccTags(registros)} type="bar" />
+                            </CardContent>
+                        </Card>
+
                         {/* Indicadores por área */}
                         <Card>
                             <CardHeader>
@@ -416,7 +434,9 @@ export default function AlunoProfilePage() {
                                                 {marcosPorArea[area]}
                                             </div>
                                             <div className="text-xs text-muted-foreground leading-tight">
-                                                {label.split(' ')[0]}
+                                                {area === 'motor_fino' ? 'M. Fina' :
+                                                    area === 'motor_grosso' ? 'M. Grossa' :
+                                                        label.split(' ')[0]}
                                             </div>
                                         </div>
                                     ))}
@@ -464,61 +484,118 @@ export default function AlunoProfilePage() {
                                             </select>
                                             <input
                                                 type="date"
+                                                value={novoMarco.data_marco}
+                                                onChange={e => setNovoMarco({ ...novoMarco, data_marco: e.target.value })}
+                                                className="px-4 py-2 bg-card rounded-lg border focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2 pt-2">
+                                            <Button type="submit" disabled={savingMarco}>
+                                                {savingMarco ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Salvar'}
+                                            </Button>
+                                            <Button type="button" variant="outline" onClick={() => setShowNewMarco(false)}>
+                                                Cancelar
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </CardContent>
+                            </Card>
                         )}
 
-                                            {/* Lista de marcos */}
-                                            {loadingMarcos ? (
-                                                <div className="flex justify-center py-8">
-                                                    <Loader2 className="w-6 h-6 animate-spin" />
+                        {/* Lista de marcos */}
+                        {loadingMarcos ? (
+                            <div className="flex justify-center py-8">
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                            </div>
+                        ) : marcos.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                                <Star className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                                <h3 className="text-lg font-medium mb-2">Nenhum marco registrado</h3>
+                                <p>Registre conquistas e progressos do aluno</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {marcos.map(marco => (
+                                    <Card key={marco.id} className="group">
+                                        <CardContent className="p-4">
+                                            <div className="flex gap-3">
+                                                <div
+                                                    className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xl"
+                                                    style={{ backgroundColor: `${AREAS_CORES[marco.area]}20` }}
+                                                >
+                                                    {AREAS_ICONES[marco.area]}
                                                 </div>
-                                            ) : marcos.length === 0 ? (
-                                                <div className="text-center py-12 text-muted-foreground">
-                                                    <Star className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                                                    <h3 className="text-lg font-medium mb-2">Nenhum marco registrado</h3>
-                                                    <p>Registre conquistas e progressos do aluno</p>
+                                                <div className="flex-1">
+                                                    <div className="flex items-start justify-between">
+                                                        <div>
+                                                            <h4 className="font-medium">{marco.titulo}</h4>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {AREAS_DESENVOLVIMENTO[marco.area]} • {formatarData(marco.data_marco)}
+                                                            </p>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-destructive"
+                                                            onClick={() => handleDeleteMarco(marco.id)}
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </Button>
+                                                    </div>
+                                                    {marco.descricao && (
+                                                        <p className="text-sm text-muted-foreground mt-2">{marco.descricao}</p>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <div className="space-y-3">
-                                                    {marcos.map(marco => (
-                                                        <Card key={marco.id} className="group">
-                                                            <CardContent className="p-4">
-                                                                <div className="flex gap-3">
-                                                                    <div
-                                                                        className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-xl"
-                                                                        style={{ backgroundColor: `${AREAS_CORES[marco.area]}20` }}
-                                                                    >
-                                                                        {AREAS_ICONES[marco.area]}
-                                                                    </div>
-                                                                    <div className="flex-1">
-                                                                        <div className="flex items-start justify-between">
-                                                                            <div>
-                                                                                <h4 className="font-medium">{marco.titulo}</h4>
-                                                                                <p className="text-xs text-muted-foreground">
-                                                                                    {AREAS_DESENVOLVIMENTO[marco.area]} • {formatarData(marco.data_marco)}
-                                                                                </p>
-                                                                            </div>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 text-destructive"
-                                                                                onClick={() => handleDeleteMarco(marco.id)}
-                                                                            >
-                                                                                <Trash2 className="w-4 h-4" />
-                                                                            </Button>
-                                                                        </div>
-                                                                        {marco.descricao && (
-                                                                            <p className="text-sm text-muted-foreground mt-2">{marco.descricao}</p>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </CardContent>
-                                                        </Card>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 )}
-                                    </div>
-                                </div>
-                                );
+
+                {/* Tab: Pareceres */}
+                {activeTab === 'pareceres' && (
+                    <div className="space-y-4">
+                        {pareceres.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                                <FileText className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                                <h3 className="text-lg font-medium mb-2">Nenhum parecer gerado</h3>
+                                <p className="mb-4">Gere o primeiro parecer para este aluno</p>
+                                <Button asChild>
+                                    <Link href={`/novo?alunoId=${aluno.id}`}>
+                                        <Sparkles className="w-4 h-4 mr-2" />
+                                        Gerar Esboço de Parecer
+                                    </Link>
+                                </Button>
+                            </div>
+                        ) : (
+                            pareceres.map(parecer => (
+                                <Card key={parecer.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                                    <CardContent className="p-4">
+                                        <Link href={`/parecer/${parecer.id}`}>
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="font-medium">
+                                                        {new Date(parecer.created_at).toLocaleDateString('pt-BR', {
+                                                            day: '2-digit', month: 'long', year: 'numeric'
+                                                        })}
+                                                    </p>
+                                                    <p className="text-sm text-muted-foreground capitalize">
+                                                        Status: {parecer.status}
+                                                    </p>
+                                                </div>
+                                                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                                            </div>
+                                        </Link>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 }

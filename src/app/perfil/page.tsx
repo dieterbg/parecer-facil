@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Loader2, Save, User, Mail } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { DataSeeder } from "@/components/dev/data-seeder";
+import { AvatarUpload } from "@/components/avatar-upload";
 
 export default function PerfilPage() {
     const { user } = useAuth();
@@ -16,6 +18,7 @@ export default function PerfilPage() {
     const [email, setEmail] = useState("");
     const [estilo, setEstilo] = useState("");
     const [paginasEsperadas, setPaginasEsperadas] = useState("1");
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -26,7 +29,7 @@ export default function PerfilPage() {
     const fetchProfile = async () => {
         const { data, error } = await supabase
             .from('professores')
-            .select('nome, email, estilo_escrita, paginas_esperadas')
+            .select('nome, email, estilo_escrita, paginas_esperadas, avatar_url')
             .eq('uid', user?.id)
             .single();
 
@@ -35,8 +38,8 @@ export default function PerfilPage() {
             setEmail(data.email || user?.email || "");
             setEstilo(data.estilo_escrita || "");
             setPaginasEsperadas(data.paginas_esperadas?.toString() || "1");
+            setAvatarUrl(data.avatar_url || null);
         } else if (user?.email) {
-            // Se não encontrou registro, preenche com o email do auth
             setEmail(user.email);
         }
     };
@@ -54,6 +57,7 @@ export default function PerfilPage() {
                     email: email,
                     estilo_escrita: estilo,
                     paginas_esperadas: parseInt(paginasEsperadas) || 1,
+                    avatar_url: avatarUrl,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'uid' });
 
@@ -87,6 +91,14 @@ export default function PerfilPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        <div className="flex justify-center mb-6">
+                            <AvatarUpload
+                                uid={user?.id || 'temp'}
+                                url={avatarUrl}
+                                onUpload={setAvatarUrl}
+                            />
+                        </div>
+
                         <div className="space-y-2">
                             <label className="text-sm font-medium flex items-center gap-2">
                                 <User className="w-4 h-4" />
@@ -128,9 +140,6 @@ export default function PerfilPage() {
                                 onChange={(e) => setPaginasEsperadas(e.target.value)}
                                 className="bg-background/50 border-border/50"
                             />
-                            <p className="text-xs text-muted-foreground">
-                                Quantidade aproximada de páginas que o parecer deve ter (1-10)
-                            </p>
                         </div>
                     </CardContent>
                 </Card>
@@ -164,6 +173,8 @@ export default function PerfilPage() {
                     )}
                     Salvar Perfil
                 </Button>
+
+                <DataSeeder />
             </div>
         </div>
     );

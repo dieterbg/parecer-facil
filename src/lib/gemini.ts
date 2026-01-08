@@ -1,10 +1,28 @@
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not defined");
+// Lazy initialization to avoid build-time errors when API key is not set
+let genAI: GoogleGenerativeAI | null = null;
+
+function getGenAI(): GoogleGenerativeAI {
+    if (!genAI) {
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error("GEMINI_API_KEY is not defined");
+        }
+        genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    }
+    return genAI;
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+export function getModel() {
+    return getGenAI().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+}
 
-export const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+// For backwards compatibility - lazy getter
+export const model = {
+    get instance() {
+        return getModel();
+    },
+    generateContent: async (...args: Parameters<ReturnType<typeof getModel>['generateContent']>) => {
+        return getModel().generateContent(...args);
+    }
+};

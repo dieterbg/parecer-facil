@@ -38,8 +38,20 @@ export function BnccRadar() {
             });
 
             // Formatar para Recharts
+            // Criar abreviações únicas para cada área
+            const getShortLabel = (key: string, label: string): string => {
+                const shortLabels: Record<string, string> = {
+                    'motor_fino': 'M. Fina',
+                    'motor_grosso': 'M. Grossa',
+                    'linguagem': 'Linguagem',
+                    'pensamento': 'Pensamento',
+                    'socioemocional': 'Social'
+                };
+                return shortLabels[key] || label.split(' ')[0];
+            };
+
             const chartData = Object.entries(AREAS_DESENVOLVIMENTO).map(([key, label]) => ({
-                subject: label.split(' ')[0], // Pegar primeira palavra para o eixo (ex: "Coordenação")
+                subject: getShortLabel(key, label),
                 fullLabel: label,
                 A: counts[key] || 0,
                 fullMark: 10, // Escala fictícia por enquanto

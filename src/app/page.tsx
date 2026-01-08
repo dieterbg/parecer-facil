@@ -40,23 +40,26 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Efeitos de Fundo */}
+      {/* Efeitos de Fundo (ajustados para a nova paleta) */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-primary/20 rounded-full blur-[120px] -z-10" />
-      <div className="absolute bottom-0 right-0 w-[800px] h-[600px] bg-blue-600/10 rounded-full blur-[100px] -z-10" />
+      <div className="absolute bottom-0 right-0 w-[800px] h-[600px] bg-secondary/10 rounded-full blur-[100px] -z-10" />
 
       <Card className="w-full max-w-md border-border/50 bg-card/40 backdrop-blur-xl shadow-2xl">
         <CardHeader className="space-y-2 text-center pb-8">
-          <div className="mx-auto w-48 h-48 flex items-center justify-center mb-4 relative">
-            <Image 
-              src="/logo.png" 
-              alt="Parecer Fácil" 
-              fill
-              className="object-contain drop-shadow-[0_0_20px_rgba(124,58,237,0.6)]"
+          <div className="mx-auto w-full max-w-md flex items-center justify-center mb-6 px-4">
+            {/* Teste com logo PNG alternativo - Blend Mode para remover fundo branco visualmente */}
+            <Image
+              src="/teste2.png?v=cachebust1"
+              alt="Floresce.ai Teste"
+              width={400}
+              height={120}
+              className="w-full h-auto object-contain mix-blend-multiply dark:mix-blend-screen"
               priority
+              unoptimized
             />
           </div>
           <CardDescription className="text-lg text-muted-foreground">
-            Inteligência Artificial para relatórios pedagógicos
+            Tecnologia para quem cuida, para que cada criança floresça.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -129,8 +132,52 @@ export default function LoginPage() {
                 : "Não tem conta? Crie agora gratuitamente"}
             </button>
           </div>
+
+          {/* Login Demo para testes */}
+          <div className="pt-4 border-t border-border/50 space-y-2">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 h-10 text-sm"
+                onClick={() => {
+                  setEmail("demo@floresce.ai");
+                  setPassword("demo123");
+                  setIsSignUp(false);
+                }}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Preencher Demo
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-10 text-sm"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/setup-demo', { method: 'POST' });
+                    const data = await res.json();
+                    if (data.success) {
+                      alert(`✅ ${data.message}\n\nTurma criada com ${data.stats?.alunos || 5} alunos e ${data.stats?.registros || 5} registros!`);
+                      setEmail("demo@floresce.ai");
+                      setPassword("demo123");
+                    } else {
+                      alert(`❌ Erro: ${data.error || 'Falha ao criar dados demo'}`);
+                    }
+                  } catch (err) {
+                    alert('❌ Erro ao conectar com a API');
+                  }
+                }}
+              >
+                + Criar Dados
+              </Button>
+            </div>
+            <p className="text-xs text-center text-muted-foreground">
+              demo@floresce.ai / demo123 • Cria conta demo com turma e registros
+            </p>
+          </div>
         </CardContent>
-      </Card>
-    </div>
+      </Card >
+    </div >
   );
 }

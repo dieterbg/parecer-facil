@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, FileText, Clock, CheckCircle, AlertCircle, Loader2, UserCircle, School, Users, Camera, Activity, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
+import { OnboardingTour } from "@/components/onboarding/onboarding-tour";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StudentsInFocus } from "@/components/dashboard/students-in-focus";
@@ -129,6 +130,11 @@ export default function DashboardPage() {
                 />
             )}
 
+            {/* Tour de Onboarding (para usuários que já passaram pelo wizard) */}
+            {!loading && metrics.totalTurmas > 0 && user && (
+                <OnboardingTour userId={user.id} />
+            )}
+
             {/* Header Section */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -138,16 +144,10 @@ export default function DashboardPage() {
                     </p>
                 </div>
                 <div className="flex gap-3">
-                    <Button variant="outline" asChild>
+                    <Button asChild className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/20">
                         <Link href="/turmas">
                             <School className="w-4 h-4 mr-2" />
                             Minhas Turmas
-                        </Link>
-                    </Button>
-                    <Button asChild className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/20">
-                        <Link href="/novo">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Novo Parecer
                         </Link>
                     </Button>
                 </div>

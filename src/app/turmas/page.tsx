@@ -5,8 +5,9 @@ import { useAuth, supabase } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Plus, Users, Loader2, Trash2, Edit, Calendar } from "lucide-react";
+import { Plus, Users, Loader2, Trash2, Edit } from "lucide-react";
 import Link from "next/link";
+import { EmptyTurmas } from "@/components/ui/empty-states";
 
 interface Turma {
     id: string;
@@ -22,6 +23,7 @@ export default function TurmasPage() {
     const [turmas, setTurmas] = useState<Turma[]>([]);
     const [loading, setLoading] = useState(true);
     const [showNewTurma, setShowNewTurma] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [novaTurma, setNovaTurma] = useState({
         nome: "",
         ano_letivo: new Date().getFullYear().toString(),
@@ -36,15 +38,17 @@ export default function TurmasPage() {
     }, [user]);
 
     const fetchTurmas = async () => {
+        if (!user) return;
+
         try {
             const { data, error } = await supabase
                 .from('turmas')
                 .select('*')
+                .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
 
-            // Buscar contagem de alunos para cada turma
             const turmasComContagem = await Promise.all(
                 (data || []).map(async (turma) => {
                     const { count } = await supabase
@@ -64,7 +68,7 @@ export default function TurmasPage() {
         }
     };
 
-    const handleCreateTurma = async (e: React.FormEvent) => {
+    const handleSaveTurma = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!novaTurma.nome.trim()) {
             alert('Por favor, preencha o nome da turma.');
@@ -78,30 +82,49 @@ export default function TurmasPage() {
 
         setSaving(true);
         try {
-            const { data, error } = await supabase
-                .from('turmas')
-                .insert([{
-                    user_id: user.id,
-                    nome: novaTurma.nome,
-                    ano_letivo: novaTurma.ano_letivo,
-                    escola: novaTurma.escola || null
-                }])
-                .select();
+            if (editingId) {
+                const { error } = await supabase
+                    .from('turmas')
+                    .update({
+                        nome: novaTurma.nome,
+                        ano_letivo: novaTurma.ano_letivo,
+                        escola: novaTurma.escola || null
+                    })
+                    .eq('id', editingId);
 
-            if (error) {
-                console.error('Erro detalhado:', error);
-                throw error;
+                if (error) throw error;
+                console.log('Turma atualizada com sucesso');
+            } else {
+                const { data, error } = await supabase
+                    .from('turmas')
+                    .insert([{
+                        user_id: user.id,
+                        nome: novaTurma.nome,
+                        ano_letivo: novaTurma.ano_letivo,
+                        escola: novaTurma.escola || null
+                    }])
+                    .select();
+
+                if (error) throw error;
+
+                console.log('Turma criada com sucesso:', data);
+                setNovaTurma({ nome: "", ano_letivo: new Date().getFullYear().toString(), escola: "" });
+                setShowNewTurma(false);
+                setEditingId(null);
+                fetchTurmas();
             }
-
-            console.log('Turma criada com sucesso:', data);
-            setNovaTurma({ nome: "", ano_letivo: new Date().getFullYear().toString(), escola: "" });
-            setShowNewTurma(false);
-            fetchTurmas();
         } catch (error) {
-            console.error('Erro ao criar turma:', error);
-            alert('Erro ao criar turma. Verifique o console para mais detalhes.');
+            console.error('Erro ao salvar turma:', error);
+            alert('Erro ao salvar turma.');
         } finally {
             setSaving(false);
+            // Se foi sucesso no update, também reseta e atualiza
+            if (editingId) {
+                setEditingId(null);
+                setShowNewTurma(false);
+                setNovaTurma({ nome: "", ano_letivo: new Date().getFullYear().toString(), escola: "" });
+                fetchTurmas();
+            }
         }
     };
 
@@ -141,13 +164,14 @@ export default function TurmasPage() {
                         <p className="text-muted-foreground mt-1">Gerencie suas turmas e alunos</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" asChild>
-                            <Link href="/planejamento" className="gap-2">
-                                <Calendar className="w-4 h-4" />
-                                Planejamento
-                            </Link>
-                        </Button>
-                        <Button onClick={() => setShowNewTurma(!showNewTurma)} className="gap-2">
+                        <Button
+                            onClick={() => {
+                                setEditingId(null);
+                                setNovaTurma({ nome: "", ano_letivo: new Date().getFullYear().toString(), escola: "" });
+                                setShowNewTurma(!showNewTurma);
+                            }}
+                            className="gap-2"
+                        >
                             <Plus className="w-4 h-4" />
                             Nova Turma
                         </Button>
@@ -157,10 +181,10 @@ export default function TurmasPage() {
                 {showNewTurma && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Criar Nova Turma</CardTitle>
+                            <CardTitle>{editingId ? 'Editar Turma' : 'Criar Nova Turma'}</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleCreateTurma} className="space-y-4">
+                            <form onSubmit={handleSaveTurma} className="space-y-4">
                                 <div>
                                     <label className="text-sm font-medium">Nome da Turma *</label>
                                     <Input
@@ -190,7 +214,7 @@ export default function TurmasPage() {
                                 </div>
                                 <div className="flex gap-2">
                                     <Button type="submit" disabled={saving}>
-                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Criar Turma"}
+                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : (editingId ? "Salvar Alterações" : "Criar Turma")}
                                     </Button>
                                     <Button type="button" variant="outline" onClick={() => setShowNewTurma(false)}>
                                         Cancelar
@@ -203,14 +227,8 @@ export default function TurmasPage() {
 
                 {turmas.length === 0 ? (
                     <Card>
-                        <CardContent className="py-12 text-center">
-                            <Users className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                            <h3 className="text-lg font-semibold mb-2">Nenhuma turma cadastrada</h3>
-                            <p className="text-muted-foreground mb-4">Crie sua primeira turma para começar a organizar seus alunos.</p>
-                            <Button onClick={() => setShowNewTurma(true)} className="gap-2">
-                                <Plus className="w-4 h-4" />
-                                Criar Primeira Turma
-                            </Button>
+                        <CardContent className="py-4">
+                            <EmptyTurmas onCreateClick={() => setShowNewTurma(true)} />
                         </CardContent>
                     </Card>
                 ) : (
@@ -226,14 +244,37 @@ export default function TurmasPage() {
                                                 {turma.escola && ` • ${turma.escola}`}
                                             </p>
                                         </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => handleDeleteTurma(turma.id, turma.nome)}
-                                            className="text-muted-foreground hover:text-destructive"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
+                                        <div className="flex gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditingId(turma.id);
+                                                    setNovaTurma({
+                                                        nome: turma.nome,
+                                                        ano_letivo: turma.ano_letivo,
+                                                        escola: turma.escola || ""
+                                                    });
+                                                    setShowNewTurma(true);
+                                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                                }}
+                                                className="text-muted-foreground hover:text-primary"
+                                            >
+                                                <Edit className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteTurma(turma.id, turma.nome);
+                                                }}
+                                                className="text-muted-foreground hover:text-destructive"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent>

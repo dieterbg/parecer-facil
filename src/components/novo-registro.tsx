@@ -97,7 +97,7 @@ export function NovoRegistro({ turmaId, alunos, currentWeek, atividade, onSucces
             await createRegistro({
                 tipo,
                 url_arquivo: urlArquivo ?? undefined,
-                descricao: descricao || null,
+                descricao: descricao || undefined,
                 is_evidencia: isEvidencia,
                 data_registro: dataRegistro,
             }, alunosSelecionados);

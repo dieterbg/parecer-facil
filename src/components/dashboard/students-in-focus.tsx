@@ -31,31 +31,47 @@ export function StudentsInFocus() {
             // 1. Buscar todos os alunos ativos
             const { data: allStudents, error: studentsError } = await supabase
                 .from('alunos')
-                .select('id, nome, foto_url, turma:turmas(nome)')
+                .select('id, nome, foto_url, turma_id, turmas(nome)')
                 .eq('ativo', true);
 
-            if (studentsError) throw studentsError;
+            if (studentsError) {
+                console.error("Erro Supabase (Alunos):", studentsError);
+                throw studentsError;
+            }
 
-            // 2. Buscar IDs de alunos com registros nos últimos 7 dias
+            // 2. Buscar IDs de alunos com registros recentes
+            // Estratégia: Buscar registros do usuário e expandir alunos, evitando RLS complexo em registros_alunos direto
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
             const { data: recentRecords, error: recordsError } = await supabase
-                .from('registros_alunos')
-                .select('aluno_id')
+                .from('registros')
+                .select('id, registros_alunos(aluno_id)')
                 .gte('created_at', sevenDaysAgo.toISOString());
 
-            if (recordsError) throw recordsError;
+            if (recordsError) {
+                // Se falhar, tentamos fallback silencioso para não quebrar a UI
+                console.warn("Erro ao buscar registros recentes:", recordsError);
+            }
 
-            const studentsWithRecords = new Set(recentRecords?.map(r => r.aluno_id));
+            // Extrair IDs únicos de alunos que tiveram registros
+            const studentsWithRecords = new Set<string>();
+            recentRecords?.forEach((reg: any) => {
+                reg.registros_alunos?.forEach((ra: any) => {
+                    studentsWithRecords.add(ra.aluno_id);
+                });
+            });
 
             // 3. Filtrar alunos SEM registros
-            const atRisk = allStudents?.filter(s => !studentsWithRecords.has(s.id)) || [];
+            const atRisk = allStudents?.filter((s: any) => !studentsWithRecords.has(s.id)).map((s: any) => ({
+                ...s,
+                turma: Array.isArray(s.turmas) ? s.turmas[0] : s.turmas
+            })) || [];
 
             // Limitar a 5 para não poluir o dashboard
             setStudents(atRisk.slice(0, 5));
         } catch (error) {
-            console.error("Erro ao buscar alunos em foco:", error);
+            console.error("Erro CRÍTICO ao buscar alunos em foco:", error);
         } finally {
             setLoading(false);
         }

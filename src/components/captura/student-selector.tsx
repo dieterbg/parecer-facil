@@ -167,7 +167,7 @@ export function StudentSelector({
                             <ul>
                                 {filteredAlunos.map(aluno => {
                                     const isSelected = selectedIds.includes(aluno.id);
-                                    const isDisabled = maxSelection && !isSelected && selectedIds.length >= maxSelection;
+                                    const isDisabled = !!(maxSelection && !isSelected && selectedIds.length >= maxSelection);
 
                                     return (
                                         <li key={aluno.id}>

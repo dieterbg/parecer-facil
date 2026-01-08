@@ -89,14 +89,14 @@ export function useRegistros(options: UseRegistrosOptions = {}) {
             // Filtrar por turma (via alunos)
             if (turmaId) {
                 registrosFiltrados = registrosFiltrados.filter(reg =>
-                    reg.registros_alunos?.some(ra => ra.aluno?.turma_id === turmaId)
+                    reg.registros_alunos?.some((ra: { aluno?: { turma_id?: string } }) => ra.aluno?.turma_id === turmaId)
                 );
             }
 
             // Filtrar por aluno específico
             if (alunoId) {
                 registrosFiltrados = registrosFiltrados.filter(reg =>
-                    reg.registros_alunos?.some(ra => ra.aluno?.id === alunoId)
+                    reg.registros_alunos?.some((ra: { aluno?: { id?: string } }) => ra.aluno?.id === alunoId)
                 );
             }
 
@@ -121,7 +121,6 @@ export function useRegistros(options: UseRegistrosOptions = {}) {
             // 1. Criar o registro
             const insertData = {
                 ...dados,
-                user_id: user.id,
                 created_by: user.id,
             };
             console.log('Inserindo registro:', insertData);

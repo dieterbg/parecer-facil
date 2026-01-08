@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
     Camera,
     Mic,
@@ -9,13 +9,17 @@ import {
     X,
     Loader2,
     Check,
-    Upload
+    Upload,
+    Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { StudentSelector } from './student-selector';
 import { ContextTags } from './context-tags';
 import { CameraCapture } from './camera-capture';
+import { VoiceCapture } from './voice-capture';
+import { PhotoCapture } from './photo-capture';
 import { useAlunos, useRegistros } from '@/hooks';
+import { getBnccColor, BNCC_LABELS } from '@/hooks/use-ai-processing';
 import type { TipoRegistro } from '@/types/database';
 
 interface QuickCaptureProps {
@@ -24,7 +28,7 @@ interface QuickCaptureProps {
     onCancel?: () => void;
 }
 
-type CaptureMode = TipoRegistro | null;
+type CaptureMode = TipoRegistro | 'foto-ai' | 'audio-ai' | null;
 
 export function QuickCapture({ turmaId, onSuccess, onCancel }: QuickCaptureProps) {
     const [mode, setMode] = useState<CaptureMode>(null);
@@ -34,16 +38,18 @@ export function QuickCapture({ turmaId, onSuccess, onCancel }: QuickCaptureProps
     const [file, setFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [tagsBncc, setTagsBncc] = useState<string[]>([]);
+    const [transcription, setTranscription] = useState('');
 
     const { alunos, loading: loadingAlunos } = useAlunos({ turmaId });
     const { contextos, createRegistro, uploadArquivo } = useRegistros({ turmaId });
 
-    // Opções de captura
+    // Opções de captura com IA
     const captureOptions = [
-        { type: 'foto' as TipoRegistro, icon: Camera, label: 'Foto', color: '#3B82F6' },
-        { type: 'audio' as TipoRegistro, icon: Mic, label: 'Áudio', color: '#22C55E' },
-        { type: 'video' as TipoRegistro, icon: Video, label: 'Vídeo', color: '#EF4444' },
-        { type: 'texto' as TipoRegistro, icon: Type, label: 'Texto', color: '#F59E0B' },
+        { type: 'foto-ai' as CaptureMode, icon: Camera, label: 'Foto', color: '#3B82F6', ai: true },
+        { type: 'audio-ai' as CaptureMode, icon: Mic, label: 'Áudio', color: '#22C55E', ai: true },
+        { type: 'video' as TipoRegistro, icon: Video, label: 'Vídeo', color: '#EF4444', ai: false },
+        { type: 'texto' as TipoRegistro, icon: Type, label: 'Texto', color: '#F59E0B', ai: false },
     ];
 
     // Voltar para seleção de modo
@@ -51,11 +57,46 @@ export function QuickCapture({ turmaId, onSuccess, onCancel }: QuickCaptureProps
         setMode(null);
         setFile(null);
         setError(null);
+        setTagsBncc([]);
+        setTranscription('');
     };
 
-    // Callback quando foto é capturada
-    const handlePhotoCapture = (capturedFile: File) => {
-        setFile(capturedFile);
+    // Callback quando foto é capturada pelo componente de IA
+    const handleAIPhotoComplete = (data: {
+        imageFile: File;
+        imageUrl: string;
+        tags_bncc: string[];
+        description: string;
+    }) => {
+        setFile(data.imageFile);
+        setTagsBncc(data.tags_bncc);
+        setDescricao(data.description);
+        setMode('foto'); // Switch to normal mode for saving
+    };
+
+    // Callback quando áudio é transcrito pelo componente de IA
+    const handleAIAudioComplete = (data: {
+        audioBlob: Blob;
+        transcription: string;
+        tags_bncc: string[];
+        suggested_students: string[];
+    }) => {
+        // Convert blob to file
+        const audioFile = new File([data.audioBlob], 'recording.webm', { type: 'audio/webm' });
+        setFile(audioFile);
+        setTagsBncc(data.tags_bncc);
+        setTranscription(data.transcription);
+        setDescricao(data.transcription); // Use transcription as description
+
+        // Auto-select suggested students
+        if (data.suggested_students.length > 0) {
+            setSelectedAlunos(prev => {
+                const newSelection = [...new Set([...prev, ...data.suggested_students])];
+                return newSelection;
+            });
+        }
+
+        setMode('audio'); // Switch to normal mode for saving
     };
 
     // Callback para upload de arquivo
@@ -90,17 +131,19 @@ export function QuickCapture({ turmaId, onSuccess, onCancel }: QuickCaptureProps
             let url_arquivo: string | undefined;
 
             // Upload do arquivo se houver
-            if (file && mode) {
-                url_arquivo = await uploadArquivo(file, mode);
+            if (file && mode && mode !== 'foto-ai' && mode !== 'audio-ai') {
+                url_arquivo = await uploadArquivo(file, mode as TipoRegistro);
             }
 
-            // Criar registro
+            // Criar registro com tags BNCC
             await createRegistro(
                 {
-                    tipo: mode!,
+                    tipo: (mode === 'foto-ai' ? 'foto' : mode === 'audio-ai' ? 'audio' : mode) as TipoRegistro,
                     url_arquivo,
                     descricao: descricao.trim() || undefined,
+                    transcricao_voz: transcription || undefined,
                     contexto_id: selectedContexto || undefined,
+                    tags_bncc: tagsBncc.length > 0 ? tagsBncc : undefined,
                 },
                 selectedAlunos
             );
@@ -116,6 +159,8 @@ export function QuickCapture({ turmaId, onSuccess, onCancel }: QuickCaptureProps
             setSelectedContexto(null);
             setDescricao('');
             setFile(null);
+            setTagsBncc([]);
+            setTranscription('');
         } catch (err) {
             console.error('Erro ao salvar registro:', err);
             setError('Erro ao salvar registro. Tente novamente.');
@@ -148,8 +193,14 @@ export function QuickCapture({ turmaId, onSuccess, onCancel }: QuickCaptureProps
                             <button
                                 key={option.type}
                                 onClick={() => setMode(option.type)}
-                                className="flex flex-col items-center gap-3 p-6 bg-card rounded-2xl border border-border hover:border-primary/50 hover:shadow-lg transition-all"
+                                className="relative flex flex-col items-center gap-3 p-6 bg-card rounded-2xl border border-border hover:border-primary/50 hover:shadow-lg transition-all"
                             >
+                                {option.ai && (
+                                    <span className="absolute top-2 right-2 flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                        <Sparkles className="w-3 h-3" />
+                                        IA
+                                    </span>
+                                )}
                                 <div
                                     className="w-16 h-16 rounded-2xl flex items-center justify-center"
                                     style={{ backgroundColor: `${option.color}20` }}
@@ -168,7 +219,67 @@ export function QuickCapture({ turmaId, onSuccess, onCancel }: QuickCaptureProps
         );
     }
 
-    // Tela de captura de foto
+    // Tela de captura de foto com IA
+    if (mode === 'foto-ai') {
+        return (
+            <div className="fixed inset-0 z-50 bg-background flex flex-col">
+                <div className="flex items-center justify-between p-4">
+                    <button
+                        onClick={handleBack}
+                        className="p-2 hover:bg-muted rounded-full transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                    <h2 className="text-lg font-medium flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        Foto com IA
+                    </h2>
+                    <div className="w-9" />
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4">
+                    <PhotoCapture
+                        turmaId={turmaId}
+                        students={alunos.map(a => ({ id: a.id, nome: a.nome }))}
+                        onPhotoAnalyzed={handleAIPhotoComplete}
+                        onError={setError}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    // Tela de captura de áudio com IA
+    if (mode === 'audio-ai') {
+        return (
+            <div className="fixed inset-0 z-50 bg-background flex flex-col">
+                <div className="flex items-center justify-between p-4">
+                    <button
+                        onClick={handleBack}
+                        className="p-2 hover:bg-muted rounded-full transition-colors"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                    <h2 className="text-lg font-medium flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-primary" />
+                        Áudio com IA
+                    </h2>
+                    <div className="w-9" />
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4">
+                    <VoiceCapture
+                        turmaId={turmaId}
+                        students={alunos.map(a => ({ id: a.id, nome: a.nome }))}
+                        onTranscriptionComplete={handleAIAudioComplete}
+                        onError={setError}
+                    />
+                </div>
+            </div>
+        );
+    }
+
+    // Tela de captura de foto tradicional
     if (mode === 'foto' && !file) {
         return (
             <div className="fixed inset-0 z-50 bg-background flex flex-col">
@@ -180,16 +291,15 @@ export function QuickCapture({ turmaId, onSuccess, onCancel }: QuickCaptureProps
                         <X className="w-5 h-5" />
                     </button>
                     <h2 className="text-lg font-medium">Tirar Foto</h2>
-                    <div className="w-9" /> {/* Spacer */}
+                    <div className="w-9" />
                 </div>
 
                 <div className="flex-1 flex flex-col items-center justify-center p-4">
                     <CameraCapture
-                        onCapture={handlePhotoCapture}
+                        onCapture={(capturedFile) => setFile(capturedFile)}
                         onCancel={handleBack}
                     />
 
-                    {/* Opção de upload */}
                     <div className="mt-4">
                         <label className="flex items-center gap-2 px-4 py-2 bg-muted rounded-lg cursor-pointer hover:bg-muted/80 transition-colors">
                             <Upload className="w-5 h-5" />
@@ -298,10 +408,36 @@ export function QuickCapture({ turmaId, onSuccess, onCancel }: QuickCaptureProps
                     </div>
                 )}
 
+                {/* BNCC Tags (se processado por IA) */}
+                {tagsBncc.length > 0 && (
+                    <div className="bg-primary/5 rounded-xl p-4 space-y-2">
+                        <h4 className="font-medium text-sm flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-primary" />
+                            Tags BNCC (IA)
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                            {tagsBncc.map(tag => (
+                                <span
+                                    key={tag}
+                                    className={cn("px-3 py-1 rounded-full text-sm font-medium", getBnccColor(tag))}
+                                    title={BNCC_LABELS[tag]}
+                                >
+                                    {tag}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Seleção de alunos */}
                 <div>
                     <label className="block text-sm font-medium text-muted-foreground mb-2">
                         Quem está neste registro? *
+                        {selectedAlunos.length > 0 && (
+                            <span className="ml-2 text-primary">
+                                ({selectedAlunos.length} selecionado{selectedAlunos.length > 1 ? 's' : ''})
+                            </span>
+                        )}
                     </label>
                     <StudentSelector
                         alunos={alunos}

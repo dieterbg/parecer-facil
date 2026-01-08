@@ -160,7 +160,7 @@ export function useMarcos(options: UseMarcosoptions = {}) {
             if (fetchError) throw fetchError;
 
             const evidenciasAtuais = marco?.evidencias_ids || [];
-            const novasEvidencias = evidenciasAtuais.filter(id => id !== registroId);
+            const novasEvidencias = evidenciasAtuais.filter((id: string) => id !== registroId);
 
             const { error: updateError } = await supabase
                 .from('marcos')

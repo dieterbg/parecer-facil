@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Plus, Calendar, Loader2 } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import { TimelineFilters } from './timeline-filters';
 import { TimelineItem } from './timeline-item';
 import { QuickCapture } from '@/components/captura/quick-capture';
+import { EmptyRegistros } from '@/components/ui/empty-states';
 import { useRegistros, useAlunos } from '@/hooks';
 import type { TipoRegistro } from '@/types/database';
 
@@ -152,24 +153,7 @@ export function TimelineView({ turmaId }: TimelineViewProps) {
 
             {/* Lista vazia */}
             {!loading && filteredRegistros.length === 0 && (
-                <div className="text-center py-12">
-                    <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                        <Calendar className="w-10 h-10 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-2">Nenhum registro encontrado</h3>
-                    <p className="text-muted-foreground mb-6">
-                        {searchTerm || selectedAlunos.length > 0 || selectedTipo || selectedContexto
-                            ? 'Tente ajustar os filtros'
-                            : 'Comece a registrar momentos da sua turma!'}
-                    </p>
-                    <button
-                        onClick={() => setShowCapture(true)}
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors"
-                    >
-                        <Plus className="w-5 h-5" />
-                        Novo Registro
-                    </button>
-                </div>
+                <EmptyRegistros onCaptureClick={() => setShowCapture(true)} />
             )}
 
             {/* Timeline agrupada por data */}
@@ -205,13 +189,18 @@ export function TimelineView({ turmaId }: TimelineViewProps) {
                 </div>
             )}
 
-            {/* FAB - Botão flutuante para novo registro */}
-            <button
-                onClick={() => setShowCapture(true)}
-                className="fixed bottom-6 right-6 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-all hover:scale-110 flex items-center justify-center z-40"
-            >
-                <Plus className="w-6 h-6" />
-            </button>
+            {/* Botão inline para novo registro */}
+            {filteredRegistros.length > 0 && (
+                <div className="flex justify-center py-6">
+                    <button
+                        onClick={() => setShowCapture(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Adicionar mais registros
+                    </button>
+                </div>
+            )}
 
             {/* Modal de Captura Rápida */}
             {showCapture && (

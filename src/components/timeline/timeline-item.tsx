@@ -117,6 +117,21 @@ export function TimelineItem({
                         </div>
                     )}
 
+                    {/* Tags BNCC */}
+                    {registro.tags_bncc && registro.tags_bncc.length > 0 && (
+                        <div className="mb-3 flex flex-wrap gap-1.5">
+                            {registro.tags_bncc.map(tag => (
+                                <span
+                                    key={tag}
+                                    className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                                    title={tag}
+                                >
+                                    {tag}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
                     {/* Meta info */}
                     <div className="flex flex-wrap items-center gap-2 text-sm">
                         {/* Data/hora */}
