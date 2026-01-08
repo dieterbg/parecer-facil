@@ -75,9 +75,9 @@ export function BnccChart({ data, type = "bar", className = "" }: BnccChartProps
                             fillOpacity={0.5}
                         />
                         <Tooltip
-                            formatter={(value: number, name: string, props: any) => [
-                                `${props.payload.count} registros`,
-                                props.payload.campo
+                            formatter={(value, name, props) => [
+                                `${props?.payload?.count ?? 0} registros`,
+                                props?.payload?.campo ?? ""
                             ]}
                             contentStyle={{
                                 backgroundColor: "hsl(var(--background))",
@@ -105,9 +105,9 @@ export function BnccChart({ data, type = "bar", className = "" }: BnccChartProps
                         width={30}
                     />
                     <Tooltip
-                        formatter={(value: number, name: string, props: any) => [
-                            `${value} registros`,
-                            props.payload.campo
+                        formatter={(value, name, props) => [
+                            `${value ?? 0} registros`,
+                            props?.payload?.campo ?? ""
                         ]}
                         contentStyle={{
                             backgroundColor: "hsl(var(--background))",

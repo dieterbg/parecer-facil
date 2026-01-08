@@ -254,7 +254,7 @@ export default function TestSetupPage() {
                         {(status === 'empty' || status === 'ready' || status === 'error') && (
                             <Button
                                 onClick={runSeed}
-                                disabled={status === 'seeding'}
+                                disabled={false}
                                 variant={status === 'ready' ? "outline" : "default"}
                                 className="w-full md:w-auto"
                             >
