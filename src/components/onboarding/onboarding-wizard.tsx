@@ -96,7 +96,7 @@ export function OnboardingWizard({ userId, onComplete }: OnboardingWizardProps) 
                             <Sparkles className="w-10 h-10 text-primary animate-pulse" />
                         </div>
                         <div className="space-y-2">
-                            <h2 className="text-2xl font-bold">Bem-vindo ao Parecer Fácil! 👋</h2>
+                            <h2 className="text-2xl font-bold">Bem-vindo ao Floresce.ai! 👋</h2>
                             <p className="text-muted-foreground">
                                 Vamos configurar sua sala de aula digital em menos de 1 minuto para que você possa começar a gerar relatórios mágicos.
                             </p>

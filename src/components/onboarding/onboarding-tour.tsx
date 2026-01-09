@@ -12,7 +12,7 @@ interface OnboardingTourProps {
 }
 
 // Chave para localStorage para controlar se o tour já foi visto
-const TOUR_COMPLETED_KEY = "parecer-facil-tour-completed";
+const TOUR_COMPLETED_KEY = "floresce-ai-tour-completed";
 
 export function OnboardingTour({
     userId,
@@ -60,7 +60,7 @@ export function OnboardingTour({
                 overlayColor: "rgba(0, 0, 0, 0.75)",
                 stagePadding: 10,
                 stageRadius: 10,
-                popoverClass: "parecer-facil-tour",
+                popoverClass: "floresce-ai-tour",
 
                 // Configurar textos em português
                 nextBtnText: "Próximo →",
@@ -72,7 +72,7 @@ export function OnboardingTour({
                 steps: [
                     {
                         popover: {
-                            title: "👋 Bem-vindo ao Parecer Fácil!",
+                            title: "👋 Bem-vindo ao Floresce.ai!",
                             description: "Vamos fazer um tour rápido pelas principais funcionalidades. Isso leva menos de 1 minuto!",
                             side: "over",
                             align: "center"
